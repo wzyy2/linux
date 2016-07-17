@@ -118,6 +118,16 @@
 		#clock-cells = <0>;
 	};
 
+	sound {
+		compatible = "rockchip,rockchip-audio-rt5640";
+		rockchip,model = "I2S-RT5640";
+		rockchip,i2s-controller = <&i2s>;
+		rockchip,audio-codec = <&rt5640>;
+		hpdet-gpios = <&gpio7 7 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&hp_det>;
+	};
+
 	gpio-keys {
 		compatible = "gpio-keys";
 		#address-cells = <1>;
@@ -215,6 +225,10 @@
 	status = "okay";
 };
 
+&i2s {
+	status = "okay";
+};
+
 &sdmmc {
 	supports-sd;
 	bus-width = <4>;
@@ -269,6 +283,19 @@
 
 &i2c0 {
 	status = "okay";
+};
+
+&i2c2 {
+	status = "okay";
+
+	rt5640: rt5640@1c {
+		compatible = "realtek,rt5640";
+		reg = <0x1c>;
+		clocks = <&cru SCLK_I2S0_OUT>;
+		clock-names = "mclk";
+		interrupt-parent = <&gpio6>;
+		interrupts = <7 IRQ_TYPE_EDGE_FALLING>;
+	};
 };
 
 &i2c5 {
@@ -333,6 +360,12 @@
 		pwrbtn: pwrbtn {
 			rockchip,pins = <0 5 RK_FUNC_GPIO &pcfg_pull_up>;
 		};
+	};
+
+	codec {
+		hp_det: hp-det {
+			rockchip,pins = <7 7 RK_FUNC_GPIO &pcfg_pull_up>;
+		};	
 	};
 
 	pmic {
