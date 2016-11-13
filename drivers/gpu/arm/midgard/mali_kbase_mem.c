@@ -31,6 +31,7 @@
 #include <linux/bug.h>
 #include <linux/compat.h>
 #include <linux/version.h>
+#include <linux/sched/mm.h>
 
 #include <mali_kbase_config.h>
 #include <mali_kbase.h>
@@ -2027,6 +2028,7 @@ static int kbase_jd_user_buf_map(struct kbase_context *kctx,
 	struct device *dev;
 	unsigned long offset;
 	unsigned long local_size;
+	unsigned int user_pages_flags = 0;
 
 	alloc = reg->gpu_alloc;
 	pa = kbase_get_gpu_phy_pages(reg);
@@ -2043,12 +2045,21 @@ static int kbase_jd_user_buf_map(struct kbase_context *kctx,
 			alloc->imported.user_buf.nr_pages,
 			reg->flags & KBASE_REG_GPU_WR,
 			0, pages, NULL);
-#else
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
 	pinned_pages = get_user_pages_remote(NULL, mm,
 			address,
 			alloc->imported.user_buf.nr_pages,
 			reg->flags & KBASE_REG_GPU_WR,
 			0, pages, NULL);
+#else
+	if (reg->flags & KBASE_REG_GPU_WR)
+		user_pages_flags |= FOLL_WRITE;
+
+	pinned_pages = get_user_pages_remote(NULL, mm,
+			address,
+			alloc->imported.user_buf.nr_pages,
+			user_pages_flags,
+			pages, NULL, NULL);
 #endif
 
 	if (pinned_pages <= 0)
