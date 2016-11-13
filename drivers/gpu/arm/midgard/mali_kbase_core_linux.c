@@ -1060,11 +1060,11 @@ static int assign_irqs(struct platform_device *pdev)
 		}
 
 #ifdef CONFIG_OF
-		if (!strcmp(irq_res->name, "JOB")) {
+		if (!strcmp(irq_res->name, "job")) {
 			irqtag = JOB_IRQ_TAG;
-		} else if (!strcmp(irq_res->name, "MMU")) {
+		} else if (!strcmp(irq_res->name, "mmu")) {
 			irqtag = MMU_IRQ_TAG;
-		} else if (!strcmp(irq_res->name, "GPU")) {
+		} else if (!strcmp(irq_res->name, "gpu")) {
 			irqtag = GPU_IRQ_TAG;
 		} else {
 			dev_err(&pdev->dev, "Invalid irq res name: '%s'\n",
@@ -3060,7 +3060,7 @@ static int power_control_init(struct platform_device *pdev)
 	}
 #endif /* LINUX_VERSION_CODE >= 3, 12, 0 */
 
-	kbdev->clock = clk_get(kbdev->dev, "clk_mali");
+	kbdev->clock = of_clk_get(kbdev->dev->of_node, 0);
 	if (IS_ERR_OR_NULL(kbdev->clock)) {
 		err = PTR_ERR(kbdev->clock);
 		kbdev->clock = NULL;
@@ -3079,8 +3079,6 @@ static int power_control_init(struct platform_device *pdev)
 			goto fail;
 		}
 	}
-
-	kbase_platform_rk_set_opp_info(kbdev);
 
 #if defined(CONFIG_OF) && defined(CONFIG_PM_OPP)
 	/* Register the OPPs if they are available in device tree */
