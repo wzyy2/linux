@@ -2973,6 +2973,13 @@ static int drm_mode_cursor_universal(struct drm_crtc *crtc,
 		src_h = fb->height << 16;
 	}
 
+	if (crtc->mode.vtotal >= 1080 && crtc->mode.htotal  >=1920 ) {
+		crtc_x = crtc_x * 2;
+		crtc_y = crtc_y * 2;
+		crtc_w = crtc_w * 2;
+		crtc_h = crtc_h * 2;
+	}
+
 	/*
 	 * setplane_internal will take care of deref'ing either the old or new
 	 * framebuffer depending on success.
