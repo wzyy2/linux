@@ -770,6 +770,8 @@ static inline void acpi_dev_remove_driver_gpios(struct acpi_device *adev)
 		adev->driver_gpios = NULL;
 }
 
+bool acpi_gpio_get_irq_resource(struct acpi_resource *ares,
+				struct acpi_resource_gpio **agpio);
 int acpi_dev_gpio_irq_get(struct acpi_device *adev, int index);
 #else
 static inline int acpi_dev_add_driver_gpios(struct acpi_device *adev,
@@ -779,6 +781,11 @@ static inline int acpi_dev_add_driver_gpios(struct acpi_device *adev,
 }
 static inline void acpi_dev_remove_driver_gpios(struct acpi_device *adev) {}
 
+static inline bool acpi_gpio_get_irq_resource(struct acpi_resource *ares,
+					      struct acpi_resource_gpio **agpio)
+{
+	return false;
+}
 static inline int acpi_dev_gpio_irq_get(struct acpi_device *adev, int index)
 {
 	return -ENXIO;
@@ -797,9 +804,17 @@ struct acpi_reference_args {
 #ifdef CONFIG_ACPI
 int acpi_dev_get_property(struct acpi_device *adev, const char *name,
 			  acpi_object_type type, const union acpi_object **obj);
-int acpi_node_get_property_reference(struct fwnode_handle *fwnode,
-				     const char *name, size_t index,
-				     struct acpi_reference_args *args);
+int __acpi_node_get_property_reference(struct fwnode_handle *fwnode,
+				const char *name, size_t index, size_t num_args,
+				struct acpi_reference_args *args);
+
+static inline int acpi_node_get_property_reference(struct fwnode_handle *fwnode,
+				const char *name, size_t index,
+				struct acpi_reference_args *args)
+{
+	return __acpi_node_get_property_reference(fwnode, name, index,
+		MAX_ACPI_REFERENCE_ARGS, args);
+}
 
 int acpi_node_prop_get(struct fwnode_handle *fwnode, const char *propname,
 		       void **valptr);
@@ -810,8 +825,9 @@ int acpi_node_prop_read(struct fwnode_handle *fwnode, const char *propname,
 int acpi_dev_prop_read(struct acpi_device *adev, const char *propname,
 		       enum dev_prop_type proptype, void *val, size_t nval);
 
-struct fwnode_handle *acpi_get_next_subnode(struct fwnode_handle *node,
-					    struct fwnode_handle *subnode);
+struct fwnode_handle *acpi_get_next_subnode(struct fwnode_handle *fwnode,
+					    struct fwnode_handle *child);
+struct fwnode_handle *acpi_node_get_parent(struct fwnode_handle *fwnode);
 
 struct acpi_probe_entry;
 typedef bool (*acpi_probe_entry_validate_subtbl)(struct acpi_subtable_header *,
@@ -875,6 +891,14 @@ static inline int acpi_dev_get_property(struct acpi_device *adev,
 	return -ENXIO;
 }
 
+static inline int
+__acpi_node_get_property_reference(struct fwnode_handle *fwnode,
+				const char *name, size_t index, size_t num_args,
+				struct acpi_reference_args *args)
+{
+	return -ENXIO;
+}
+
 static inline int acpi_node_get_property_reference(struct fwnode_handle *fwnode,
 				const char *name, size_t index,
 				struct acpi_reference_args *args)
@@ -920,9 +944,14 @@ static inline int acpi_dev_prop_read(struct acpi_device *adev,
 	return -ENXIO;
 }
 
-static inline struct fwnode_handle *acpi_get_next_subnode(
-						struct fwnode_handle *node,
-						struct fwnode_handle *subnode)
+static inline struct fwnode_handle *
+acpi_get_next_subnode(struct fwnode_handle *fwnode, struct fwnode_handle *child)
+{
+	return NULL;
+}
+
+static inline struct fwnode_handle *
+acpi_node_get_parent(struct fwnode_handle *fwnode)
 {
 	return NULL;
 }
