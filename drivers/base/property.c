@@ -908,20 +908,40 @@ struct fwnode_handle *fwnode_get_next_child_node(struct fwnode_handle *fwnode,
 EXPORT_SYMBOL_GPL(fwnode_get_next_child_node);
 
 /**
- * device_get_named_child_node - Return first matching named child node handle
- * @dev: Device to find the named child node for.
+ * device_get_next_child_node - Return the next child node handle for a device
+ * @dev: Device to find the next child node for.
+ * @child: Handle to one of the device's child nodes or a null handle.
+ */
+struct fwnode_handle *device_get_next_child_node(struct device *dev,
+						 struct fwnode_handle *child)
+{
+	struct acpi_device *adev = ACPI_COMPANION(dev);
+	struct fwnode_handle *fwnode = NULL;
+
+	if (dev->of_node)
+		fwnode = &dev->of_node->fwnode;
+	else if (adev)
+		fwnode = acpi_fwnode_handle(adev);
+
+	return fwnode_get_next_child_node(fwnode, child);
+}
+EXPORT_SYMBOL_GPL(device_get_next_child_node);
+
+/**
+ * fwnode_get_named_child_node - Return first matching named child node handle
+ * @fwnode: Firmware node to find the named child node for.
  * @childname: String to match child node name against.
  */
-struct fwnode_handle *fwnode_get_named_child_node(struct fwnode_handle *node,
+struct fwnode_handle *fwnode_get_named_child_node(struct fwnode_handle *fwnode,
 						  const char *childname)
 {
 	struct fwnode_handle *child;
 
 	/*
-	 * Find first matching named child node of this device.
+	 * Find first matching named child node of this fwnode.
 	 * For ACPI this will be a data only sub-node.
 	 */
-	fwnode_for_each_child_node(node, child) {
+	fwnode_for_each_child_node(fwnode, child) {
 		if (is_of_node(child)) {
 			if (!of_node_cmp(to_of_node(child)->name, childname))
 				return child;
@@ -934,19 +954,6 @@ struct fwnode_handle *fwnode_get_named_child_node(struct fwnode_handle *node,
 	return NULL;
 }
 EXPORT_SYMBOL_GPL(fwnode_get_named_child_node);
-
-
-/**
- * device_get_next_child_node - Return the next child node handle for a device
- * @dev: Device to find the next child node for.
- * @child: Handle to one of the device's child nodes or a null handle.
- */
-struct fwnode_handle *device_get_next_child_node(struct device *dev,
-						 struct fwnode_handle *child)
-{
-	return fwnode_get_next_child_node(dev_fwnode(dev), child);
-}
-EXPORT_SYMBOL_GPL(device_get_next_child_node);
 
 /**
  * device_get_named_child_node - Return first matching named child node handle
