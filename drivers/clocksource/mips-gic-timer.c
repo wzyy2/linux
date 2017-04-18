@@ -109,20 +109,23 @@ static int gic_clockevent_init(void)
 {
 	int ret;
 
-	if (!cpu_has_counter || !gic_frequency)
+	if (!gic_frequency)
 		return -ENXIO;
 
 	ret = setup_percpu_irq(gic_timer_irq, &gic_compare_irqaction);
-	if (ret < 0)
+	if (ret < 0) {
+		pr_err("GIC timer IRQ %d setup failed: %d\n",
+		       gic_timer_irq, ret);
 		return ret;
+	}
 
 	cpuhp_setup_state(CPUHP_AP_MIPS_GIC_TIMER_STARTING,
-			  "AP_MIPS_GIC_TIMER_STARTING", gic_starting_cpu,
-			  gic_dying_cpu);
+			  "clockevents/mips/gic/timer:starting",
+			  gic_starting_cpu, gic_dying_cpu);
 	return 0;
 }
 
-static cycle_t gic_hpt_read(struct clocksource *cs)
+static u64 gic_hpt_read(struct clocksource *cs)
 {
 	return gic_read_count();
 }
@@ -164,7 +167,7 @@ void __init gic_clocksource_init(unsigned int frequency)
 	gic_start_count();
 }
 
-static void __init gic_clocksource_of_init(struct device_node *node)
+static int __init gic_clocksource_of_init(struct device_node *node)
 {
 	struct clk *clk;
 	int ret;

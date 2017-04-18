@@ -22,6 +22,7 @@
 #include <linux/device.h>
 #include <linux/init.h>
 #include <linux/bootmem.h>
+#include <linux/nmi.h>
 #include <linux/syscalls.h>
 #include <linux/console.h>
 #include <linux/highmem.h>
@@ -30,7 +31,7 @@
 #include <linux/compiler.h>
 #include <linux/ktime.h>
 
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <asm/mmu_context.h>
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
@@ -38,7 +39,7 @@
 
 #include "power.h"
 
-#ifdef CONFIG_DEBUG_RODATA
+#ifdef CONFIG_STRICT_KERNEL_RWX
 static bool hibernate_restore_protection;
 static bool hibernate_restore_protection_active;
 
@@ -73,7 +74,7 @@ static inline void hibernate_restore_protection_begin(void) {}
 static inline void hibernate_restore_protection_end(void) {}
 static inline void hibernate_restore_protect_page(void *page_address) {}
 static inline void hibernate_restore_unprotect_page(void *page_address) {}
-#endif /* CONFIG_DEBUG_RODATA */
+#endif /* CONFIG_STRICT_KERNEL_RWX */
 
 static int swsusp_page_is_free(struct page *);
 static void swsusp_set_page_forbidden(struct page *);
@@ -835,9 +836,9 @@ static bool memory_bm_pfn_present(struct memory_bitmap *bm, unsigned long pfn)
  */
 static bool rtree_next_node(struct memory_bitmap *bm)
 {
-	bm->cur.node = list_entry(bm->cur.node->list.next,
-				  struct rtree_node, list);
-	if (&bm->cur.node->list != &bm->cur.zone->leaves) {
+	if (!list_is_last(&bm->cur.node->list, &bm->cur.zone->leaves)) {
+		bm->cur.node = list_entry(bm->cur.node->list.next,
+					  struct rtree_node, list);
 		bm->cur.node_pfn += BM_BITS_PER_BLOCK;
 		bm->cur.node_bit  = 0;
 		touch_softlockup_watchdog();
@@ -845,9 +846,9 @@ static bool rtree_next_node(struct memory_bitmap *bm)
 	}
 
 	/* No more nodes, goto next zone */
-	bm->cur.zone = list_entry(bm->cur.zone->list.next,
+	if (!list_is_last(&bm->cur.zone->list, &bm->zones)) {
+		bm->cur.zone = list_entry(bm->cur.zone->list.next,
 				  struct mem_zone_bm_rtree, list);
-	if (&bm->cur.zone->list != &bm->zones) {
 		bm->cur.node = list_entry(bm->cur.zone->leaves.next,
 					  struct rtree_node, list);
 		bm->cur.node_pfn = 0;
@@ -1130,6 +1131,28 @@ void free_basic_memory_bitmaps(void)
 	kfree(bm2);
 
 	pr_debug("PM: Basic memory bitmaps freed\n");
+}
+
+void clear_free_pages(void)
+{
+#ifdef CONFIG_PAGE_POISONING_ZERO
+	struct memory_bitmap *bm = free_pages_map;
+	unsigned long pfn;
+
+	if (WARN_ON(!(free_pages_map)))
+		return;
+
+	memory_bm_position_reset(bm);
+	pfn = memory_bm_next_pfn(bm);
+	while (pfn != BM_END_OF_MAP) {
+		if (pfn_valid(pfn))
+			clear_highpage(pfn_to_page(pfn));
+
+		pfn = memory_bm_next_pfn(bm);
+	}
+	memory_bm_position_reset(bm);
+	pr_info("PM: free pages cleared after restore\n");
+#endif /* PAGE_POISONING_ZERO */
 }
 
 /**

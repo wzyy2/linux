@@ -320,7 +320,7 @@ static int __init armada_370_xp_timer_common_init(struct device_node *np)
 	}
 
 	res = cpuhp_setup_state(CPUHP_AP_ARMADA_TIMER_STARTING,
-				"AP_ARMADA_TIMER_STARTING",
+				"clockevents/armada:starting",
 				armada_370_xp_timer_starting_cpu,
 				armada_370_xp_timer_dying_cpu);
 	if (res) {
@@ -338,7 +338,6 @@ static int __init armada_xp_timer_init(struct device_node *np)
 	struct clk *clk = of_clk_get_by_name(np, "fixed");
 	int ret;
 
-	clk = of_clk_get(np, 0);
 	if (IS_ERR(clk)) {
 		pr_err("Failed to get clock");
 		return PTR_ERR(clk);

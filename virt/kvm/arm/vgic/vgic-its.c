@@ -51,7 +51,7 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid)
 
 	irq = kzalloc(sizeof(struct vgic_irq), GFP_KERNEL);
 	if (!irq)
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 
 	INIT_LIST_HEAD(&irq->lpi_list);
 	INIT_LIST_HEAD(&irq->ap_list);
@@ -350,7 +350,7 @@ static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
 
 		irq = vgic_get_irq(vcpu->kvm, NULL, intids[i]);
 		spin_lock(&irq->irq_lock);
-		irq->pending = pendmask & (1U << bit_nr);
+		irq->pending_latch = pendmask & (1U << bit_nr);
 		vgic_queue_irq_unlock(vcpu->kvm, irq);
 		vgic_put_irq(vcpu->kvm, irq);
 	}
@@ -358,29 +358,6 @@ static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
 	kfree(intids);
 
 	return ret;
-}
-
-static unsigned long vgic_mmio_read_its_ctlr(struct kvm *vcpu,
-					     struct vgic_its *its,
-					     gpa_t addr, unsigned int len)
-{
-	u32 reg = 0;
-
-	mutex_lock(&its->cmd_lock);
-	if (its->creadr == its->cwriter)
-		reg |= GITS_CTLR_QUIESCENT;
-	if (its->enabled)
-		reg |= GITS_CTLR_ENABLE;
-	mutex_unlock(&its->cmd_lock);
-
-	return reg;
-}
-
-static void vgic_mmio_write_its_ctlr(struct kvm *kvm, struct vgic_its *its,
-				     gpa_t addr, unsigned int len,
-				     unsigned long val)
-{
-	its->enabled = !!(val & GITS_CTLR_ENABLE);
 }
 
 static unsigned long vgic_mmio_read_its_typer(struct kvm *kvm,
@@ -441,39 +418,63 @@ static unsigned long vgic_mmio_read_its_idregs(struct kvm *kvm,
  * Find the target VCPU and the LPI number for a given devid/eventid pair
  * and make this IRQ pending, possibly injecting it.
  * Must be called with the its_lock mutex held.
+ * Returns 0 on success, a positive error value for any ITS mapping
+ * related errors and negative error values for generic errors.
  */
-static void vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
-				 u32 devid, u32 eventid)
+static int vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
+				u32 devid, u32 eventid)
 {
+	struct kvm_vcpu *vcpu;
 	struct its_itte *itte;
 
 	if (!its->enabled)
-		return;
+		return -EBUSY;
 
 	itte = find_itte(its, devid, eventid);
-	/* Triggering an unmapped IRQ gets silently dropped. */
-	if (itte && its_is_collection_mapped(itte->collection)) {
-		struct kvm_vcpu *vcpu;
+	if (!itte || !its_is_collection_mapped(itte->collection))
+		return E_ITS_INT_UNMAPPED_INTERRUPT;
 
-		vcpu = kvm_get_vcpu(kvm, itte->collection->target_addr);
-		if (vcpu && vcpu->arch.vgic_cpu.lpis_enabled) {
-			spin_lock(&itte->irq->irq_lock);
-			itte->irq->pending = true;
-			vgic_queue_irq_unlock(kvm, itte->irq);
-		}
-	}
+	vcpu = kvm_get_vcpu(kvm, itte->collection->target_addr);
+	if (!vcpu)
+		return E_ITS_INT_UNMAPPED_INTERRUPT;
+
+	if (!vcpu->arch.vgic_cpu.lpis_enabled)
+		return -EBUSY;
+
+	spin_lock(&itte->irq->irq_lock);
+	itte->irq->pending_latch = true;
+	vgic_queue_irq_unlock(kvm, itte->irq);
+
+	return 0;
+}
+
+static struct vgic_io_device *vgic_get_its_iodev(struct kvm_io_device *dev)
+{
+	struct vgic_io_device *iodev;
+
+	if (dev->ops != &kvm_io_gic_ops)
+		return NULL;
+
+	iodev = container_of(dev, struct vgic_io_device, dev);
+
+	if (iodev->iodev_type != IODEV_ITS)
+		return NULL;
+
+	return iodev;
 }
 
 /*
  * Queries the KVM IO bus framework to get the ITS pointer from the given
  * doorbell address.
  * We then call vgic_its_trigger_msi() with the decoded data.
+ * According to the KVM_SIGNAL_MSI API description returns 1 on success.
  */
 int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
 {
 	u64 address;
 	struct kvm_io_device *kvm_io_dev;
 	struct vgic_io_device *iodev;
+	int ret;
 
 	if (!vgic_has_its(kvm))
 		return -ENODEV;
@@ -485,15 +486,28 @@ int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
 
 	kvm_io_dev = kvm_io_bus_get_dev(kvm, KVM_MMIO_BUS, address);
 	if (!kvm_io_dev)
-		return -ENODEV;
+		return -EINVAL;
 
-	iodev = container_of(kvm_io_dev, struct vgic_io_device, dev);
+	iodev = vgic_get_its_iodev(kvm_io_dev);
+	if (!iodev)
+		return -EINVAL;
 
 	mutex_lock(&iodev->its->its_lock);
-	vgic_its_trigger_msi(kvm, iodev->its, msi->devid, msi->data);
+	ret = vgic_its_trigger_msi(kvm, iodev->its, msi->devid, msi->data);
 	mutex_unlock(&iodev->its->its_lock);
 
-	return 0;
+	if (ret < 0)
+		return ret;
+
+	/*
+	 * KVM_SIGNAL_MSI demands a return value > 0 for success and 0
+	 * if the guest has blocked the MSI. So we map any LPI mapping
+	 * related error to that.
+	 */
+	if (ret)
+		return 0;
+	else
+		return 1;
 }
 
 /* Requires the its_lock to be held. */
@@ -502,7 +516,8 @@ static void its_free_itte(struct kvm *kvm, struct its_itte *itte)
 	list_del(&itte->itte_list);
 
 	/* This put matches the get in vgic_add_lpi. */
-	vgic_put_irq(kvm, itte->irq);
+	if (itte->irq)
+		vgic_put_irq(kvm, itte->irq);
 
 	kfree(itte);
 }
@@ -594,21 +609,22 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
 	int index;
 	u64 indirect_ptr;
 	gfn_t gfn;
+	int esz = GITS_BASER_ENTRY_SIZE(baser);
 
 	if (!(baser & GITS_BASER_INDIRECT)) {
 		phys_addr_t addr;
 
-		if (id >= (l1_tbl_size / GITS_BASER_ENTRY_SIZE(baser)))
+		if (id >= (l1_tbl_size / esz))
 			return false;
 
-		addr = BASER_ADDRESS(baser) + id * GITS_BASER_ENTRY_SIZE(baser);
+		addr = BASER_ADDRESS(baser) + id * esz;
 		gfn = addr >> PAGE_SHIFT;
 
 		return kvm_is_visible_gfn(its->dev->kvm, gfn);
 	}
 
 	/* calculate and check the index into the 1st level */
-	index = id / (SZ_64K / GITS_BASER_ENTRY_SIZE(baser));
+	index = id / (SZ_64K / esz);
 	if (index >= (l1_tbl_size / sizeof(u64)))
 		return false;
 
@@ -632,8 +648,8 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
 	indirect_ptr &= GENMASK_ULL(51, 16);
 
 	/* Find the address of the actual entry */
-	index = id % (SZ_64K / GITS_BASER_ENTRY_SIZE(baser));
-	indirect_ptr += index * GITS_BASER_ENTRY_SIZE(baser);
+	index = id % (SZ_64K / esz);
+	indirect_ptr += index * esz;
 	gfn = indirect_ptr >> PAGE_SHIFT;
 
 	return kvm_is_visible_gfn(its->dev->kvm, gfn);
@@ -697,6 +713,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
 	struct its_device *device;
 	struct its_collection *collection, *new_coll = NULL;
 	int lpi_nr;
+	struct vgic_irq *irq;
 
 	device = find_its_device(its, device_id);
 	if (!device)
@@ -710,6 +727,10 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
 	    lpi_nr >= max_lpis_propbaser(kvm->arch.vgic.propbaser))
 		return E_ITS_MAPTI_PHYSICALID_OOR;
 
+	/* If there is an existing mapping, behavior is UNPREDICTABLE. */
+	if (find_itte(its, device_id, event_id))
+		return 0;
+
 	collection = find_collection(its, coll_id);
 	if (!collection) {
 		int ret = vgic_its_alloc_collection(its, &collection, coll_id);
@@ -718,22 +739,28 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
 		new_coll = collection;
 	}
 
-	itte = find_itte(its, device_id, event_id);
+	itte = kzalloc(sizeof(struct its_itte), GFP_KERNEL);
 	if (!itte) {
-		itte = kzalloc(sizeof(struct its_itte), GFP_KERNEL);
-		if (!itte) {
-			if (new_coll)
-				vgic_its_free_collection(its, coll_id);
-			return -ENOMEM;
-		}
-
-		itte->event_id	= event_id;
-		list_add_tail(&itte->itte_list, &device->itt_head);
+		if (new_coll)
+			vgic_its_free_collection(its, coll_id);
+		return -ENOMEM;
 	}
+
+	itte->event_id	= event_id;
+	list_add_tail(&itte->itte_list, &device->itt_head);
 
 	itte->collection = collection;
 	itte->lpi = lpi_nr;
-	itte->irq = vgic_add_lpi(kvm, lpi_nr);
+
+	irq = vgic_add_lpi(kvm, lpi_nr);
+	if (IS_ERR(irq)) {
+		if (new_coll)
+			vgic_its_free_collection(its, coll_id);
+		its_free_itte(kvm, itte);
+		return PTR_ERR(irq);
+	}
+	itte->irq = irq;
+
 	update_affinity_itte(kvm, itte);
 
 	/*
@@ -863,7 +890,7 @@ static int vgic_its_cmd_handle_clear(struct kvm *kvm, struct vgic_its *its,
 	if (!itte)
 		return E_ITS_CLEAR_UNMAPPED_INTERRUPT;
 
-	itte->irq->pending = false;
+	itte->irq->pending_latch = false;
 
 	return 0;
 }
@@ -981,9 +1008,7 @@ static int vgic_its_cmd_handle_int(struct kvm *kvm, struct vgic_its *its,
 	u32 msi_data = its_cmd_get_id(its_cmd);
 	u64 msi_devid = its_cmd_get_deviceid(its_cmd);
 
-	vgic_its_trigger_msi(kvm, its, msi_devid, msi_data);
-
-	return 0;
+	return vgic_its_trigger_msi(kvm, its, msi_devid, msi_data);
 }
 
 /*
@@ -1113,33 +1138,16 @@ static void vgic_mmio_write_its_cbaser(struct kvm *kvm, struct vgic_its *its,
 #define ITS_CMD_SIZE			32
 #define ITS_CMD_OFFSET(reg)		((reg) & GENMASK(19, 5))
 
-/*
- * By writing to CWRITER the guest announces new commands to be processed.
- * To avoid any races in the first place, we take the its_cmd lock, which
- * protects our ring buffer variables, so that there is only one user
- * per ITS handling commands at a given time.
- */
-static void vgic_mmio_write_its_cwriter(struct kvm *kvm, struct vgic_its *its,
-					gpa_t addr, unsigned int len,
-					unsigned long val)
+/* Must be called with the cmd_lock held. */
+static void vgic_its_process_commands(struct kvm *kvm, struct vgic_its *its)
 {
 	gpa_t cbaser;
 	u64 cmd_buf[4];
-	u32 reg;
 
-	if (!its)
+	/* Commands are only processed when the ITS is enabled. */
+	if (!its->enabled)
 		return;
 
-	mutex_lock(&its->cmd_lock);
-
-	reg = update_64bit_reg(its->cwriter, addr & 7, len, val);
-	reg = ITS_CMD_OFFSET(reg);
-	if (reg >= ITS_CMD_BUFFER_SIZE(its->cbaser)) {
-		mutex_unlock(&its->cmd_lock);
-		return;
-	}
-
-	its->cwriter = reg;
 	cbaser = CBASER_ADDRESS(its->cbaser);
 
 	while (its->cwriter != its->creadr) {
@@ -1159,6 +1167,34 @@ static void vgic_mmio_write_its_cwriter(struct kvm *kvm, struct vgic_its *its,
 		if (its->creadr == ITS_CMD_BUFFER_SIZE(its->cbaser))
 			its->creadr = 0;
 	}
+}
+
+/*
+ * By writing to CWRITER the guest announces new commands to be processed.
+ * To avoid any races in the first place, we take the its_cmd lock, which
+ * protects our ring buffer variables, so that there is only one user
+ * per ITS handling commands at a given time.
+ */
+static void vgic_mmio_write_its_cwriter(struct kvm *kvm, struct vgic_its *its,
+					gpa_t addr, unsigned int len,
+					unsigned long val)
+{
+	u64 reg;
+
+	if (!its)
+		return;
+
+	mutex_lock(&its->cmd_lock);
+
+	reg = update_64bit_reg(its->cwriter, addr & 7, len, val);
+	reg = ITS_CMD_OFFSET(reg);
+	if (reg >= ITS_CMD_BUFFER_SIZE(its->cbaser)) {
+		mutex_unlock(&its->cmd_lock);
+		return;
+	}
+	its->cwriter = reg;
+
+	vgic_its_process_commands(kvm, its);
 
 	mutex_unlock(&its->cmd_lock);
 }
@@ -1239,6 +1275,39 @@ static void vgic_mmio_write_its_baser(struct kvm *kvm,
 	*regptr = reg;
 }
 
+static unsigned long vgic_mmio_read_its_ctlr(struct kvm *vcpu,
+					     struct vgic_its *its,
+					     gpa_t addr, unsigned int len)
+{
+	u32 reg = 0;
+
+	mutex_lock(&its->cmd_lock);
+	if (its->creadr == its->cwriter)
+		reg |= GITS_CTLR_QUIESCENT;
+	if (its->enabled)
+		reg |= GITS_CTLR_ENABLE;
+	mutex_unlock(&its->cmd_lock);
+
+	return reg;
+}
+
+static void vgic_mmio_write_its_ctlr(struct kvm *kvm, struct vgic_its *its,
+				     gpa_t addr, unsigned int len,
+				     unsigned long val)
+{
+	mutex_lock(&its->cmd_lock);
+
+	its->enabled = !!(val & GITS_CTLR_ENABLE);
+
+	/*
+	 * Try to process any pending commands. This function bails out early
+	 * if the ITS is disabled or no commands have been queued.
+	 */
+	vgic_its_process_commands(kvm, its);
+
+	mutex_unlock(&its->cmd_lock);
+}
+
 #define REGISTER_ITS_DESC(off, rd, wr, length, acc)		\
 {								\
 	.reg_offset = off,					\
@@ -1288,13 +1357,13 @@ void vgic_enable_lpis(struct kvm_vcpu *vcpu)
 		its_sync_lpi_pending_table(vcpu);
 }
 
-static int vgic_its_init_its(struct kvm *kvm, struct vgic_its *its)
+static int vgic_register_its_iodev(struct kvm *kvm, struct vgic_its *its)
 {
 	struct vgic_io_device *iodev = &its->iodev;
 	int ret;
 
-	if (its->initialized)
-		return 0;
+	if (!its->initialized)
+		return -EBUSY;
 
 	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
 		return -ENXIO;
@@ -1310,9 +1379,6 @@ static int vgic_its_init_its(struct kvm *kvm, struct vgic_its *its)
 	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, iodev->base_addr,
 				      KVM_VGIC_V3_ITS_SIZE, &iodev->dev);
 	mutex_unlock(&kvm->slots_lock);
-
-	if (!ret)
-		its->initialized = true;
 
 	return ret;
 }
@@ -1435,9 +1501,6 @@ static int vgic_its_set_attr(struct kvm_device *dev,
 		if (type != KVM_VGIC_ITS_ADDR_TYPE)
 			return -ENODEV;
 
-		if (its->initialized)
-			return -EBUSY;
-
 		if (copy_from_user(&addr, uaddr, sizeof(addr)))
 			return -EFAULT;
 
@@ -1453,7 +1516,9 @@ static int vgic_its_set_attr(struct kvm_device *dev,
 	case KVM_DEV_ARM_VGIC_GRP_CTRL:
 		switch (attr->attr) {
 		case KVM_DEV_ARM_VGIC_CTRL_INIT:
-			return vgic_its_init_its(dev->kvm, its);
+			its->initialized = true;
+
+			return 0;
 		}
 		break;
 	}
@@ -1497,4 +1562,31 @@ int kvm_vgic_register_its_device(void)
 {
 	return kvm_register_device_ops(&kvm_arm_vgic_its_ops,
 				       KVM_DEV_TYPE_ARM_VGIC_ITS);
+}
+
+/*
+ * Registers all ITSes with the kvm_io_bus framework.
+ * To follow the existing VGIC initialization sequence, this has to be
+ * done as late as possible, just before the first VCPU runs.
+ */
+int vgic_register_its_iodevs(struct kvm *kvm)
+{
+	struct kvm_device *dev;
+	int ret = 0;
+
+	list_for_each_entry(dev, &kvm->devices, vm_node) {
+		if (dev->ops != &kvm_arm_vgic_its_ops)
+			continue;
+
+		ret = vgic_register_its_iodev(kvm, dev->private);
+		if (ret)
+			return ret;
+		/*
+		 * We don't need to care about tearing down previously
+		 * registered ITSes, as the kvm_io_bus framework removes
+		 * them for us if the VM gets destroyed.
+		 */
+	}
+
+	return ret;
 }

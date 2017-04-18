@@ -265,13 +265,14 @@ ENTRY(sha256_mb_mgr_get_comp_job_avx2)
 	vpinsrd	$1, _args_digest+1*32(state, idx, 4), %xmm0, %xmm0
 	vpinsrd	$2, _args_digest+2*32(state, idx, 4), %xmm0, %xmm0
 	vpinsrd	$3, _args_digest+3*32(state, idx, 4), %xmm0, %xmm0
-	movl	_args_digest+4*32(state, idx, 4), tmp2_w
+	vmovd   _args_digest(state , idx, 4) , %xmm0
 	vpinsrd	$1, _args_digest+5*32(state, idx, 4), %xmm1, %xmm1
 	vpinsrd	$2, _args_digest+6*32(state, idx, 4), %xmm1, %xmm1
 	vpinsrd	$3, _args_digest+7*32(state, idx, 4), %xmm1, %xmm1
 
-	vmovdqu	%xmm0, _result_digest(job_rax)
-	movl	tmp2_w, _result_digest+1*16(job_rax)
+        vmovdqu %xmm0, _result_digest(job_rax)
+        offset =  (_result_digest + 1*16)
+        vmovdqu %xmm1, offset(job_rax)
 
 	pop	%rbx
 
@@ -283,11 +284,13 @@ ENTRY(sha256_mb_mgr_get_comp_job_avx2)
 	ret
 ENDPROC(sha256_mb_mgr_get_comp_job_avx2)
 
-.data
-
+.section	.rodata.cst16.clear_low_nibble, "aM", @progbits, 16
 .align 16
 clear_low_nibble:
 .octa	0x000000000000000000000000FFFFFFF0
+
+.section	.rodata.cst8, "aM", @progbits, 8
+.align 8
 one:
 .quad	1
 two:

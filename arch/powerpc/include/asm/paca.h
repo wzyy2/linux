@@ -183,16 +183,10 @@ struct paca_struct {
 	 */
 	u16 in_mce;
 	u8 hmi_event_available;		 /* HMI event is available */
-	/*
-	 * Bitmap for sibling subcore status. See kvm/book3s_hv_ras.c for
-	 * more details
-	 */
-	struct sibling_subcore_state *sibling_subcore_state;
 #endif
 
 	/* Stuff for accurate time accounting */
 	struct cpu_accounting_data accounting;
-	u64 stolen_time;		/* TB ticks taken by hypervisor */
 	u64 dtl_ridx;			/* read index in dispatch log */
 	struct dtl_entry *dtl_curr;	/* pointer corresponding to dtl_ridx */
 
@@ -202,6 +196,13 @@ struct paca_struct {
 	struct kvmppc_book3s_shadow_vcpu shadow_vcpu;
 #endif
 	struct kvmppc_host_state kvm_hstate;
+#ifdef CONFIG_KVM_BOOK3S_HV_POSSIBLE
+	/*
+	 * Bitmap for sibling subcore status. See kvm/book3s_hv_ras.c for
+	 * more details
+	 */
+	struct sibling_subcore_state *sibling_subcore_state;
+#endif
 #endif
 };
 

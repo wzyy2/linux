@@ -475,14 +475,6 @@ static void __lpc_get_mac(struct netdata_local *pldat, u8 *mac)
 	mac[5] = tmp >> 8;
 }
 
-static void __lpc_eth_clock_enable(struct netdata_local *pldat, bool enable)
-{
-	if (enable)
-		clk_prepare_enable(pldat->clk);
-	else
-		clk_disable_unprepare(pldat->clk);
-}
-
 static void __lpc_params_setup(struct netdata_local *pldat)
 {
 	u32 tmp;
@@ -1007,7 +999,7 @@ static int lpc_eth_poll(struct napi_struct *napi, int budget)
 	rx_done = __lpc_handle_recv(ndev, budget);
 
 	if (rx_done < budget) {
-		napi_complete(napi);
+		napi_complete_done(napi, rx_done);
 		lpc_eth_enable_int(pldat->net_base);
 	}
 
@@ -1056,7 +1048,7 @@ static int lpc_eth_close(struct net_device *ndev)
 	writel(0, LPC_ENET_MAC2(pldat->net_base));
 	spin_unlock_irqrestore(&pldat->lock, flags);
 
-	__lpc_eth_clock_enable(pldat, false);
+	clk_disable_unprepare(pldat->clk);
 
 	return 0;
 }
@@ -1197,11 +1189,14 @@ static int lpc_eth_ioctl(struct net_device *ndev, struct ifreq *req, int cmd)
 static int lpc_eth_open(struct net_device *ndev)
 {
 	struct netdata_local *pldat = netdev_priv(ndev);
+	int ret;
 
 	if (netif_msg_ifup(pldat))
 		dev_dbg(&pldat->pdev->dev, "enabling %s\n", ndev->name);
 
-	__lpc_eth_clock_enable(pldat, true);
+	ret = clk_prepare_enable(pldat->clk);
+	if (ret)
+		return ret;
 
 	/* Suspended PHY makes LPC ethernet core block, so resume now */
 	phy_resume(ndev->phydev);
@@ -1261,7 +1256,6 @@ static const struct net_device_ops lpc_netdev_ops = {
 	.ndo_do_ioctl		= lpc_eth_ioctl,
 	.ndo_set_mac_address	= lpc_set_mac_address,
 	.ndo_validate_addr	= eth_validate_addr,
-	.ndo_change_mtu		= eth_change_mtu,
 };
 
 static int lpc_eth_drv_probe(struct platform_device *pdev)
@@ -1320,7 +1314,9 @@ static int lpc_eth_drv_probe(struct platform_device *pdev)
 	}
 
 	/* Enable network clock */
-	__lpc_eth_clock_enable(pldat, true);
+	ret = clk_prepare_enable(pldat->clk);
+	if (ret)
+		goto err_out_clk_put;
 
 	/* Map IO space */
 	pldat->net_base = ioremap(res->start, resource_size(res));
@@ -1454,6 +1450,7 @@ err_out_iounmap:
 	iounmap(pldat->net_base);
 err_out_disable_clocks:
 	clk_disable_unprepare(pldat->clk);
+err_out_clk_put:
 	clk_put(pldat->clk);
 err_out_free_dev:
 	free_netdev(ndev);

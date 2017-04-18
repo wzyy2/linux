@@ -505,6 +505,15 @@ static int poll_cq(struct t4_wq *wq, struct t4_cq *cq, struct t4_cqe *cqe,
 	}
 
 	/*
+	 * Special cqe for drain WR completions...
+	 */
+	if (CQE_OPCODE(hw_cqe) == C4IW_DRAIN_OPCODE) {
+		*cookie = CQE_DRAIN_COOKIE(hw_cqe);
+		*cqe = *hw_cqe;
+		goto skip_cqe;
+	}
+
+	/*
 	 * Gotta tweak READ completions:
 	 *	1) the cqe doesn't contain the sq_wptr from the wr.
 	 *	2) opcode not reflected from the wr.
@@ -721,6 +730,7 @@ static int c4iw_poll_cq_one(struct c4iw_cq *chp, struct ib_wc *wc)
 		    CQE_OPCODE(&cqe) == FW_RI_SEND_WITH_SE_INV) {
 			wc->ex.invalidate_rkey = CQE_WRID_STAG(&cqe);
 			wc->wc_flags |= IB_WC_WITH_INVALIDATE;
+			c4iw_invalidate_mr(qhp->rhp, wc->ex.invalidate_rkey);
 		}
 	} else {
 		switch (CQE_OPCODE(&cqe)) {
@@ -746,6 +756,14 @@ static int c4iw_poll_cq_one(struct c4iw_cq *chp, struct ib_wc *wc)
 			break;
 		case FW_RI_FAST_REGISTER:
 			wc->opcode = IB_WC_REG_MR;
+
+			/* Invalidate the MR if the fastreg failed */
+			if (CQE_STATUS(&cqe) != T4_ERR_SUCCESS)
+				c4iw_invalidate_mr(qhp->rhp,
+						   CQE_WRID_FR_STAG(&cqe));
+			break;
+		case C4IW_DRAIN_OPCODE:
+			wc->opcode = IB_WC_SEND;
 			break;
 		default:
 			printk(KERN_ERR MOD "Unexpected opcode %d "
@@ -811,15 +829,8 @@ static int c4iw_poll_cq_one(struct c4iw_cq *chp, struct ib_wc *wc)
 		}
 	}
 out:
-	if (wq) {
-		if (unlikely(qhp->attr.state != C4IW_QP_STATE_RTS)) {
-			if (t4_sq_empty(wq))
-				complete(&qhp->sq_drained);
-			if (t4_rq_empty(wq))
-				complete(&qhp->rq_drained);
-		}
+	if (wq)
 		spin_unlock(&qhp->lock);
-	}
 	return ret;
 }
 
@@ -1016,15 +1027,15 @@ int c4iw_resize_cq(struct ib_cq *cq, int cqe, struct ib_udata *udata)
 int c4iw_arm_cq(struct ib_cq *ibcq, enum ib_cq_notify_flags flags)
 {
 	struct c4iw_cq *chp;
-	int ret;
+	int ret = 0;
 	unsigned long flag;
 
 	chp = to_c4iw_cq(ibcq);
 	spin_lock_irqsave(&chp->lock, flag);
-	ret = t4_arm_cq(&chp->cq,
-			(flags & IB_CQ_SOLICITED_MASK) == IB_CQ_SOLICITED);
+	t4_arm_cq(&chp->cq,
+		  (flags & IB_CQ_SOLICITED_MASK) == IB_CQ_SOLICITED);
+	if (flags & IB_CQ_REPORT_MISSED_EVENTS)
+		ret = t4_cq_notempty(&chp->cq);
 	spin_unlock_irqrestore(&chp->lock, flag);
-	if (ret && !(flags & IB_CQ_REPORT_MISSED_EVENTS))
-		ret = 0;
 	return ret;
 }

@@ -205,14 +205,23 @@ static int ct_seq_show(struct seq_file *s, void *v)
 	struct nf_conn *ct = nf_ct_tuplehash_to_ctrack(hash);
 	const struct nf_conntrack_l3proto *l3proto;
 	const struct nf_conntrack_l4proto *l4proto;
+	struct net *net = seq_file_net(s);
 	int ret = 0;
 
 	NF_CT_ASSERT(ct);
 	if (unlikely(!atomic_inc_not_zero(&ct->ct_general.use)))
 		return 0;
 
+	if (nf_ct_should_gc(ct)) {
+		nf_ct_kill(ct);
+		goto release;
+	}
+
 	/* we only want to print DIR_ORIGINAL */
 	if (NF_CT_DIRECTION(hash))
+		goto release;
+
+	if (!net_eq(nf_ct_net(ct), net))
 		goto release;
 
 	l3proto = __nf_ct_l3proto_find(nf_ct_l3num(ct));
@@ -224,8 +233,7 @@ static int ct_seq_show(struct seq_file *s, void *v)
 	seq_printf(s, "%-8s %u %-8s %u %ld ",
 		   l3proto->name, nf_ct_l3num(ct),
 		   l4proto->name, nf_ct_protonum(ct),
-		   timer_pending(&ct->timeout)
-		   ? (long)(ct->timeout.expires - jiffies)/HZ : 0);
+		   nf_ct_expires(ct)  / HZ);
 
 	if (l4proto->print_conntrack)
 		l4proto->print_conntrack(s, ct);
@@ -349,13 +357,13 @@ static int ct_cpu_seq_show(struct seq_file *seq, void *v)
 	seq_printf(seq, "%08x  %08x %08x %08x %08x %08x %08x %08x "
 			"%08x %08x %08x %08x %08x  %08x %08x %08x %08x\n",
 		   nr_conntracks,
-		   st->searched,
+		   0,
 		   st->found,
-		   st->new,
+		   0,
 		   st->invalid,
 		   st->ignore,
-		   st->delete,
-		   st->delete_list,
+		   0,
+		   0,
 		   st->insert,
 		   st->insert_failed,
 		   st->drop,
@@ -444,6 +452,9 @@ static int log_invalid_proto_max __read_mostly = 255;
 /* size the user *wants to set */
 static unsigned int nf_conntrack_htable_size_user __read_mostly;
 
+extern unsigned int nf_conntrack_default_on;
+unsigned int nf_conntrack_default_on __read_mostly = 1;
+
 static int
 nf_conntrack_hash_sysctl(struct ctl_table *table, int write,
 			 void __user *buffer, size_t *lenp, loff_t *ppos)
@@ -506,6 +517,13 @@ static struct ctl_table nf_ct_sysctl_table[] = {
 		.procname	= "nf_conntrack_expect_max",
 		.data		= &nf_ct_expect_max,
 		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "nf_conntrack_default_on",
+		.data		= &nf_conntrack_default_on,
+		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec,
 	},
@@ -623,6 +641,9 @@ static int __init nf_conntrack_standalone_init(void)
 	int ret = nf_conntrack_init_start();
 	if (ret < 0)
 		goto out_start;
+
+	BUILD_BUG_ON(SKB_NFCT_PTRMASK != NFCT_PTRMASK);
+	BUILD_BUG_ON(NFCT_INFOMASK <= IP_CT_NUMBER);
 
 #ifdef CONFIG_SYSCTL
 	nf_ct_netfilter_header =

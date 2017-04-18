@@ -9,7 +9,8 @@
 #define IN_ARCH_STRING_C 1
 
 #include <linux/types.h>
-#include <linux/module.h>
+#include <linux/string.h>
+#include <linux/export.h>
 
 /*
  * Helper functions to find the end of a string
@@ -20,7 +21,7 @@ static inline char *__strend(const char *s)
 
 	asm volatile ("0: srst  %0,%1\n"
 		      "   jo    0b"
-		      : "+d" (r0), "+a" (s) :  : "cc" );
+		      : "+d" (r0), "+a" (s) :  : "cc", "memory");
 	return (char *) r0;
 }
 
@@ -31,7 +32,7 @@ static inline char *__strnend(const char *s, size_t n)
 
 	asm volatile ("0: srst  %0,%1\n"
 		      "   jo    0b"
-		      : "+d" (p), "+a" (s) : "d" (r0) : "cc" );
+		      : "+d" (p), "+a" (s) : "d" (r0) : "cc", "memory");
 	return (char *) p;
 }
 
@@ -213,7 +214,7 @@ int strcmp(const char *cs, const char *ct)
 		      "   sr   %0,%1\n"
 		      "1:"
 		      : "+d" (ret), "+d" (r0), "+a" (cs), "+a" (ct)
-		      : : "cc" );
+		      : : "cc", "memory");
 	return ret;
 }
 EXPORT_SYMBOL(strcmp);
@@ -237,11 +238,10 @@ char * strrchr(const char * s, int c)
 EXPORT_SYMBOL(strrchr);
 
 static inline int clcle(const char *s1, unsigned long l1,
-			const char *s2, unsigned long l2,
-			int *diff)
+			const char *s2, unsigned long l2)
 {
 	register unsigned long r2 asm("2") = (unsigned long) s1;
-	register unsigned long r3 asm("3") = (unsigned long) l2;
+	register unsigned long r3 asm("3") = (unsigned long) l1;
 	register unsigned long r4 asm("4") = (unsigned long) s2;
 	register unsigned long r5 asm("5") = (unsigned long) l2;
 	int cc;
@@ -251,8 +251,7 @@ static inline int clcle(const char *s1, unsigned long l1,
 		      "   ipm   %0\n"
 		      "   srl   %0,28"
 		      : "=&d" (cc), "+a" (r2), "+a" (r3),
-			"+a" (r4), "+a" (r5) : : "cc");
-	*diff = *(char *)r2 - *(char *)r4;
+			"+a" (r4), "+a" (r5) : : "cc", "memory");
 	return cc;
 }
 
@@ -270,9 +269,9 @@ char * strstr(const char * s1,const char * s2)
 		return (char *) s1;
 	l1 = __strend(s1) - s1;
 	while (l1-- >= l2) {
-		int cc, dummy;
+		int cc;
 
-		cc = clcle(s1, l1, s2, l2, &dummy);
+		cc = clcle(s1, l2, s2, l2);
 		if (!cc)
 			return (char *) s1;
 		s1++;
@@ -300,7 +299,7 @@ void *memchr(const void *s, int c, size_t n)
 		      "   jl	1f\n"
 		      "   la    %0,0\n"
 		      "1:"
-		      : "+a" (ret), "+&a" (s) : "d" (r0) : "cc" );
+		      : "+a" (ret), "+&a" (s) : "d" (r0) : "cc", "memory");
 	return (void *) ret;
 }
 EXPORT_SYMBOL(memchr);
@@ -313,11 +312,11 @@ EXPORT_SYMBOL(memchr);
  */
 int memcmp(const void *cs, const void *ct, size_t n)
 {
-	int ret, diff;
+	int ret;
 
-	ret = clcle(cs, n, ct, n, &diff);
+	ret = clcle(cs, n, ct, n);
 	if (ret)
-		ret = diff;
+		ret = ret == 1 ? -1 : 1;
 	return ret;
 }
 EXPORT_SYMBOL(memcmp);
@@ -338,7 +337,7 @@ void *memscan(void *s, int c, size_t n)
 
 	asm volatile ("0: srst  %0,%1\n"
 		      "   jo    0b\n"
-		      : "+a" (ret), "+&a" (s) : "d" (r0) : "cc" );
+		      : "+a" (ret), "+&a" (s) : "d" (r0) : "cc", "memory");
 	return (void *) ret;
 }
 EXPORT_SYMBOL(memscan);

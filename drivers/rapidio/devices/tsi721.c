@@ -37,8 +37,8 @@
 #include "tsi721.h"
 
 #ifdef DEBUG
-u32 dbg_level;
-module_param(dbg_level, uint, S_IWUSR | S_IRUGO);
+u32 tsi_dbg_level;
+module_param_named(dbg_level, tsi_dbg_level, uint, S_IWUSR | S_IRUGO);
 MODULE_PARM_DESC(dbg_level, "Debugging output level (default 0 = none)");
 #endif
 
@@ -1161,7 +1161,7 @@ static int tsi721_rio_map_inb_mem(struct rio_mport *mport, dma_addr_t lstart,
 		} else if (ibw_start < (ib_win->rstart + ib_win->size) &&
 			   (ibw_start + ibw_size) > ib_win->rstart) {
 			/* Return error if address translation involved */
-			if (direct && ib_win->xlat) {
+			if (!direct || ib_win->xlat) {
 				ret = -EFAULT;
 				break;
 			}
