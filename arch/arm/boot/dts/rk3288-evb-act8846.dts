@@ -65,6 +65,15 @@
 	};
 };
 
+&cpu0 {
+	cpu0-supply = <&vdd_cpu>;
+};
+
+&gpu {
+	status = "okay";
+	mali-supply = <&vdd_gpu>;
+};
+
 &i2c0 {
 	clock-frequency = <400000>;
 

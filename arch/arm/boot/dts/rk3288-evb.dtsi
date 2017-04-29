@@ -253,6 +253,10 @@
 	status = "okay";
 };
 
+&hevc_service {
+	status = "okay";
+};
+
 &i2c0 {
 	status = "okay";
 };
@@ -269,6 +273,10 @@
 	status = "okay";
 };
 
+&rga {
+	status = "okay";
+};
+
 &uart0 {
 	status = "okay";
 };
@@ -278,6 +286,10 @@
 };
 
 &uart2 {
+	status = "okay";
+};
+
+&vpu_service {
 	status = "okay";
 };
 
