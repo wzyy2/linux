@@ -139,6 +139,12 @@
 	cpu0-supply = <&vdd_cpu>;
 };
 
+
+&gpu {
+	status = "okay";
+	mali-supply = <&vdd_gpu>;
+};
+
 &gmac {
 	phy-supply = <&vcc33_lan>;
 	phy-mode = "rgmii";
@@ -532,5 +538,17 @@
 };
 
 &wdt {
+	status = "okay";
+};
+
+&hevc_service {
+	status = "okay";
+};
+
+&rga {
+	status = "okay";
+};
+
+&vpu_service {
 	status = "okay";
 };
