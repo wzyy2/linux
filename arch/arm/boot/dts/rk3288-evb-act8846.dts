@@ -40,7 +40,6 @@
 
 /dts-v1/;
 #include "rk3288-evb.dtsi"
-#include "rk3288-android.dtsi"
 
 / {
 	compatible = "rockchip,rk3288-evb-act8846", "rockchip,rk3288";
@@ -86,11 +85,6 @@
 	cpu0-supply = <&vdd_cpu>;
 };
 
-&edp {
-	vcc-supply = <&vdd10_lcd>;
-	vccio-supply = <&vcc18_lcd>;
-};
-
 &gpu {
 	status = "okay";
 	mali-supply = <&vdd_gpu>;
@@ -111,9 +105,6 @@
 		regulator-enable-ramp-delay = <300>;
 		regulator-ramp-delay = <8000>;
 		vin-supply = <&vcc_sys>;
-		regulator-state-mem {
-			regulator-off-in-suspend;
-		};
 	};
 
 	vdd_gpu: syr828@41 {
@@ -126,9 +117,6 @@
 		regulator-always-on;
 		regulator-ramp-delay = <6000>;
 		vin-supply = <&vcc_sys>;
-		regulator-state-mem {
-			regulator-off-in-suspend;
-		};
 	};
 
 	hym8563: hym8563@51 {
@@ -246,66 +234,11 @@
 	};
 };
 
-&edp {
-	status = "okay";
+&lvds_panel {
+	power-supply = <&vcc_lcd>;
 };
 
 &edp_panel {
-	compatible ="lg,lp079qx1-sp0v", "simple-panel";
-	enable-gpios = <&gpio7 4 GPIO_ACTIVE_HIGH>;
-	pinctrl-0 = <&lcd_cs>;
-	power-supply = <&vcc_lcd>;
-	delay,prepare = <120>;
-	status = "okay";
-
-	disp_timings: display-timings {
-		native-mode = <&timing0>;
-
-		timing0: timing0 {
-			clock-frequency = <200000000>;
-			hactive = <1536>;
-			vactive = <2048>;
-			hfront-porch = <12>;
-			hsync-len = <16>;
-			hback-porch = <48>;
-			vfront-porch = <8>;
-			vsync-len = <4>;
-			vback-porch = <8>;
-			hsync-active = <0>;
-			vsync-active = <0>;
-			de-active = <0>;
-			pixelclk-active = <0>;
-		};
-	};
-};
-
-&edp_phy {
-	status = "okay";
-};
-
-&i2c1 {
-	status = "okay";
-	clock-frequency = <400000>;
-
-	mpu6050@68 {
-		compatible = "invensense,mpu6050";
-		status = "okay";
-		pinctrl-names = "default";
-		pinctrl-0 = <&mpu6050_irq_gpio>;
-		reg = <0x68>;
-		irq-gpio = <&gpio8 0 IRQ_TYPE_EDGE_RISING>;
-		mpu-int_config = <0x10>;
-		mpu-level_shifter = <0>;
-		mpu-orientation = <0 1 0 1 0 0 0 0 1>;
-		orientation-x= <0>;
-		orientation-y= <1>;
-		orientation-z= <0>;
-		support-hw-poweroff = <1>;
-		mpu-debug = <1>;
-	};
-};
-
-&lvds_panel {
 	power-supply = <&vcc_lcd>;
 };
 
@@ -319,12 +252,6 @@
 	wifi {
 		wifi_pwr: wifi-pwr {
 			rockchip,pins = <7 9 RK_FUNC_GPIO &pcfg_pull_none>;
-		};
-	};
-
-	mpu6050 {
-		mpu6050_irq_gpio: mpu6050-irq-gpio {
-			rockchip,pins = <8 0 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
 };
