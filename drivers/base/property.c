@@ -885,28 +885,6 @@ struct fwnode_handle *fwnode_get_parent(struct fwnode_handle *fwnode)
 EXPORT_SYMBOL_GPL(fwnode_get_parent);
 
 /**
- * fwnode_get_next_child_node - Return the next child node handle for a device
- * @node: Node to find the next child node for.
- * @child: Handle to one of the device's child nodes or a null handle.
- */
-struct fwnode_handle *fwnode_get_next_child_node(struct fwnode_handle *node,
-						 struct fwnode_handle *child)
-{
-	if (IS_ENABLED(CONFIG_OF) && is_of_node(node)) {
-		struct device_node *np;
-
-		np = of_get_next_available_child(to_of_node(node),
-						   to_of_node(child));
-		if (np)
-			return &np->fwnode;
-	} else if (IS_ENABLED(CONFIG_ACPI) && is_acpi_node(node)) {
-		return acpi_get_next_subnode(node, child);
-	}
-	return NULL;
-}
-EXPORT_SYMBOL_GPL(fwnode_get_next_child_node);
-
-/**
  * fwnode_get_named_child_node - Return first matching named child node handle
  * @node: Node to find the named child node for.
  * @childname: String to match child node name against.
