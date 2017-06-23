@@ -401,6 +401,10 @@
 	};
 };
 
+&rga {
+	status = "okay";
+};
+
 &saradc {
 	vref-supply = <&vcc_18>;
 	status = "okay";

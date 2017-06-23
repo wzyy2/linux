@@ -283,6 +283,10 @@
 	};
 };
 
+&rga {
+	status = "okay";
+};
+
 &tsadc {
 	rockchip,hw-tshut-mode = <0>;
 	rockchip,hw-tshut-polarity = <0>;
