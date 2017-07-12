@@ -40,6 +40,8 @@
 
 #define OF_OV_GPIO_PD "rockchip,pd-gpio"
 #define OF_OV_GPIO_PWR "rockchip,pwr-gpio"
+#define OF_OV_GPIO_SND_PWR "rockchip,pwr-snd-gpio"
+#define OF_OV_GPIO_TRD_PWD "rockchip,pwr-trd-gpio"
 #define OF_OV_GPIO_FLASH "rockchip,flash-gpio"
 #define OF_OV_GPIO_TORCH "rockchip,torch-gpio"
 #define OF_OV_GPIO_RESET "rockchip,rst-gpio"
@@ -73,6 +75,8 @@
 
 const char *PLTFRM_CAMERA_MODULE_PIN_PD = OF_OV_GPIO_PD;
 const char *PLTFRM_CAMERA_MODULE_PIN_PWR = OF_OV_GPIO_PWR;
+const char *PLTFRM_CAMERA_MODULE_PIN_SND_PWR = OF_OV_GPIO_SND_PWR;
+const char *PLTFRM_CAMERA_MODULE_PIN_TRD_PWR = OF_OV_GPIO_TRD_PWD;
 const char *PLTFRM_CAMERA_MODULE_PIN_FLASH = OF_OV_GPIO_FLASH;
 const char *PLTFRM_CAMERA_MODULE_PIN_TORCH = OF_OV_GPIO_TORCH;
 const char *PLTFRM_CAMERA_MODULE_PIN_RESET = OF_OV_GPIO_RESET;
@@ -137,7 +141,7 @@ struct pltfrm_camera_module_itf {
 };
 
 struct pltfrm_camera_module_data {
-	struct pltfrm_camera_module_gpio gpios[6];
+	struct pltfrm_camera_module_gpio gpios[7];
 	struct pinctrl *pinctrl;
 	struct pinctrl_state *pins_default;
 	struct pinctrl_state *pins_sleep;
@@ -219,8 +223,12 @@ static int pltfrm_camera_module_init_gpio(
 			if (IS_ERR_VALUE(ret)) {
 				if ((pdata->gpios[i].label ==
 					PLTFRM_CAMERA_MODULE_PIN_RESET) ||
+ 					(pdata->gpios[i].label ==
+					PLTFRM_CAMERA_MODULE_PIN_PWR) ||
 					(pdata->gpios[i].label ==
-					PLTFRM_CAMERA_MODULE_PIN_PWR)) {
+					PLTFRM_CAMERA_MODULE_PIN_SND_PWR) ||
+					(pdata->gpios[i].label ==
+					PLTFRM_CAMERA_MODULE_PIN_TRD_PWR)) {
 					pltfrm_camera_module_pr_warn(sd,
 					"GPIO #%d ('%s') may be reused!\n",
 					pdata->gpios[i].pltfrm_gpio,
@@ -485,6 +493,13 @@ static struct pltfrm_camera_module_data *pltfrm_camera_module_get_data(
 		pdata->gpios[4].label,
 		0,
 		&pdata->gpios[4].active_low);
+
+	pdata->gpios[6].label = PLTFRM_CAMERA_MODULE_PIN_TRD_PWR;
+	pdata->gpios[6].pltfrm_gpio = of_get_named_gpio_flags(
+		np,
+		pdata->gpios[6].label,
+		0,
+		&pdata->gpios[6].active_low);
 
 	ret = of_property_read_string(np, OF_CAMERA_MODULE_NAME,
 			&pdata->info.module_name);
@@ -1210,6 +1225,11 @@ int pltfrm_camera_module_set_pm_state(
 
 		pltfrm_camera_module_set_pin_state(
 			sd,
+			PLTFRM_CAMERA_MODULE_PIN_SND_PWR,
+			PLTFRM_CAMERA_MODULE_PIN_STATE_ACTIVE);
+
+		pltfrm_camera_module_set_pin_state(
+			sd,
 			PLTFRM_CAMERA_MODULE_PIN_RESET,
 			PLTFRM_CAMERA_MODULE_PIN_STATE_ACTIVE);
 		usleep_range(100, 300);
@@ -1242,6 +1262,11 @@ int pltfrm_camera_module_set_pm_state(
 		pltfrm_camera_module_set_pin_state(
 			sd,
 			PLTFRM_CAMERA_MODULE_PIN_PWR,
+			PLTFRM_CAMERA_MODULE_PIN_STATE_INACTIVE);
+
+		pltfrm_camera_module_set_pin_state(
+			sd,
+			PLTFRM_CAMERA_MODULE_PIN_SND_PWR,
 			PLTFRM_CAMERA_MODULE_PIN_STATE_INACTIVE);
 
 		if (pdata->regulators.regulator) {

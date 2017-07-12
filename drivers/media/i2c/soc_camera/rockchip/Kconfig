@@ -25,3 +25,11 @@ config VIDEO_imx323
 	default n
 	---help---
 	  This is imx323 camera driver adapt to rockchip cif isp platform.
+
+config VIDEO_tc358749xbg
+	tristate "tc358749xbg driver adapt to rockchip cif isp platform"
+	depends on VIDEO_V4L2 && VIDEO_RK_CIF_ISP10 && I2C
+
+	default n
+	---help---
+	  This is tc358749xbg hdmi video driver adapt to rockchip cif isp platform.
