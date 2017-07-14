@@ -216,6 +216,21 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
 		"Private Packet, IVTV Format",
 		NULL
 	};
+	static const char * const blend_modes[] = {
+		"Source",
+		"Source Top",
+		"Source In",
+		"Source Out",
+		"Source Over",
+		"Destination",
+		"Destination Top",
+		"Destination In",
+		"Destination Out",
+		"Destination Over",
+		"Add",
+		"Clear",
+		NULL
+	};
 	static const char * const camera_power_line_frequency[] = {
 		"Disabled",
 		"50 Hz",
@@ -522,6 +537,8 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
 		return camera_exposure_metering;
 	case V4L2_CID_AUTO_FOCUS_RANGE:
 		return camera_auto_focus_range;
+	case V4L2_CID_BLEND:
+		return blend_modes;
 	case V4L2_CID_COLORFX:
 		return colorfx;
 	case V4L2_CID_AUTO_N_PRESET_WHITE_BALANCE:
@@ -655,6 +672,7 @@ const char *v4l2_ctrl_get_name(u32 id)
 	case V4L2_CID_MIN_BUFFERS_FOR_OUTPUT:	return "Min Number of Output Buffers";
 	case V4L2_CID_ALPHA_COMPONENT:		return "Alpha Component";
 	case V4L2_CID_COLORFX_CBCR:		return "Color Effects, CbCr";
+	case V4L2_CID_BLEND:			return "Compositing and Blend Modes";
 
 	/* Codec controls */
 	/* The MPEG controls are applicable to all codec controls
@@ -1033,6 +1051,7 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
 	case V4L2_CID_MPEG_STREAM_VBI_FMT:
 	case V4L2_CID_EXPOSURE_AUTO:
 	case V4L2_CID_AUTO_FOCUS_RANGE:
+	case V4L2_CID_BLEND:
 	case V4L2_CID_COLORFX:
 	case V4L2_CID_AUTO_N_PRESET_WHITE_BALANCE:
 	case V4L2_CID_TUNE_PREEMPHASIS:

@@ -140,8 +140,24 @@ enum v4l2_colorfx {
 #define V4L2_CID_ALPHA_COMPONENT		(V4L2_CID_BASE+41)
 #define V4L2_CID_COLORFX_CBCR			(V4L2_CID_BASE+42)
 
+#define V4L2_CID_BLEND				(V4L2_CID_BASE+43)
+enum v4l2_blend_mode {
+	V4L2_BLEND_SRC				= 0,
+	V4L2_BLEND_SRCATOP			= 1,
+	V4L2_BLEND_SRCIN			= 2,
+	V4L2_BLEND_SRCOUT			= 3,
+	V4L2_BLEND_SRCOVER			= 4,
+	V4L2_BLEND_DST				= 5,
+	V4L2_BLEND_DSTATOP			= 6,
+	V4L2_BLEND_DSTIN			= 7,
+	V4L2_BLEND_DSTOUT			= 8,
+	V4L2_BLEND_DSTOVER			= 9,
+	V4L2_BLEND_ADD				= 10,
+	V4L2_BLEND_CLEAR			= 11,
+};
+
 /* last CID + 1 */
-#define V4L2_CID_LASTP1                         (V4L2_CID_BASE+43)
+#define V4L2_CID_LASTP1                         (V4L2_CID_BASE+44)
 
 /* USER-class private control IDs */
 
