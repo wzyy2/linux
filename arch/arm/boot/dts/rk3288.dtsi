@@ -1765,8 +1765,8 @@
 
 		i2c2 {
 			i2c2_xfer: i2c2-xfer {
-				rockchip,pins = <6 9 RK_FUNC_1 &pcfg_pull_none>,
-						<6 10 RK_FUNC_1 &pcfg_pull_none>;
+				rockchip,pins = <6 9 RK_FUNC_1 &pcfg_pull_up>,
+						<6 10 RK_FUNC_1 &pcfg_pull_up>;
 			};
 		};
 
