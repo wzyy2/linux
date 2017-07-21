@@ -294,6 +294,15 @@
 	};
 };
 
+&cif_isp0 {
+	rockchip,camera-modules-attached = <&camera0>;
+	status = "okay";
+};
+
+&isp_mmu {
+	status = "okay";
+};
+
 &cpu0 {
 	cpu0-supply = <&vdd_cpu>;
 };
@@ -302,7 +311,7 @@
 	vcc-supply = <&vdd_10>;
 	vccio-supply = <&vcc_18>;
 	force-hpd;
-	status = "okay";
+	status = "disabled";
 
 	ports {
 		edp_out: port@1 {
@@ -518,29 +527,31 @@
 &i2c1 {
 	status = "okay";
 
-	mpu6050@68 {
-		compatible = "invensense,mpu6050";
-		reg = <0x68>;
-		interrupt-parent = <&gpio5>;
-		interrupts = <RK_PB4 IRQ_TYPE_LEVEL_LOW>;
-		mount-matrix = "0",
-			       "1",
-			       "0",
-			       "-1",
-			       "0",
-			       "0",
-			       "0",
-			       "0",
-			       "-1";
+	camera0: camera-module@0f {
+		status = "okay";
+		compatible = "toshiba,tc358749xbg-v4l2-i2c-subdev";
+		reg = <0x0f>;
+		device_type = "v4l2-i2c-subdev";
+
+		clocks = <&cru SCLK_VIP_OUT>;
+		clock-names = "clk_cif_out";
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&hdmiin_gpios>;
+
+		//rockchip,pwr-gpio = <&gpio2 6 GPIO_ACTIVE_HIGH>;
+		//rckchip,pwr-snd-gpio = <&gpio2 9 GPIO_ACTIVE_HIGH>;
+		//rockchip,pwr-trd-gpio = <&gpio2 5 GPIO_ACTIVE_HIGH>;
+		//rockchip,rst-gpio = <&gpio2 7 GPIO_ACTIVE_HIGH>;
+
+		power-gpios = <&gpio7 21 GPIO_ACTIVE_HIGH>;
+		stanby-gpios = <&gpio7 5 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpio8 8 GPIO_ACTIVE_HIGH>;
+		int-gpios = <&gpio8 9 GPIO_ACTIVE_HIGH>;
+
+		rockchip,camera-module-mclk-name = "clk_cif_out";
+		rockchip,camera-module-mipi-dphy-index = <0>;
 	};
-};
-
-&i2c2 {
-	status = "okay";
-};
-
-&i2c4 {
-	status = "okay";
 };
 
 &io_domains {
@@ -603,6 +614,16 @@
 
 		phy_rst: phy-rst {
 			rockchip,pins = <4 8 RK_FUNC_GPIO &pcfg_output_high>;
+		};
+	};
+
+	hdmiin {
+		hdmiin_gpios: hdmiin_gpios {
+		rockchip,pins =
+				<7 5 RK_FUNC_GPIO &pcfg_pull_none>,
+				<7 21 RK_FUNC_GPIO &pcfg_pull_none>,
+				<8 8 RK_FUNC_GPIO &pcfg_pull_none>,
+				<8 9 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
 
