@@ -71,15 +71,12 @@ static const struct cif_fmt_info cif_isp10_output_formats[] = {
 	CIF_FMT_YUV(V4L2_PIX_FMT_YUV422P, MEDIA_BUS_FMT_YUYV8_2X8, 16, 2, 1, 0),
 	CIF_FMT_YUV(V4L2_PIX_FMT_NV16, MEDIA_BUS_FMT_YUYV8_2X8, 16, 1, 1, 0),
 	CIF_FMT_YUV(V4L2_PIX_FMT_NV61, MEDIA_BUS_FMT_YUYV8_2X8, 16, 1, 1, 0),
-	CIF_FMT_YUV(V4L2_PIX_FMT_YVU422M, MEDIA_BUS_FMT_YUYV8_2X8, 16, 2, 3, 0),
+
 	/* yuv420 */
 	CIF_FMT_YUV(V4L2_PIX_FMT_NV21, MEDIA_BUS_FMT_YUYV8_1_5X8, 12, 1, 1, 1),
 	CIF_FMT_YUV(V4L2_PIX_FMT_NV12, MEDIA_BUS_FMT_YVYU8_1_5X8, 12, 1, 1, 0),
-	CIF_FMT_YUV(V4L2_PIX_FMT_NV21M, MEDIA_BUS_FMT_YUYV8_1_5X8, 12, 1, 2, 1),
-	CIF_FMT_YUV(V4L2_PIX_FMT_NV12M, MEDIA_BUS_FMT_YVYU8_1_5X8, 12, 1, 2, 0),
 	CIF_FMT_YUV(V4L2_PIX_FMT_YVU420, MEDIA_BUS_FMT_YVYU8_1_5X8, 12, 2, 1, 1),
-	/* yuv444 */
-	CIF_FMT_YUV(V4L2_PIX_FMT_YUV444M, 0, 24, 2, 3, 0),
+
 	/* yuv400 */
 	CIF_FMT_YUV(V4L2_PIX_FMT_GREY, MEDIA_BUS_FMT_Y8_1X8, 8, 1, 1, 0),
 	/* raw */
@@ -1191,9 +1188,6 @@ static void cif_isp10_v4l2_vb2_queue(struct vb2_buffer *vb)
 	struct cif_isp10_stream *stream = to_stream_by_id(dev, id);
 	unsigned long lock_flags = 0;
 
-	v4l2_info(&dev->v4l2_dev,
-		  "buffer type %s\n", v4l2_type_names[queue->type]);
-
 	spin_lock_irqsave(&dev->strm_vdevs.vbq_lock, lock_flags);
 	list_add_tail(&ispbuf->queue, &stream->buf_queue);
 	spin_unlock_irqrestore(&dev->strm_vdevs.vbq_lock, lock_flags);
@@ -1366,10 +1360,6 @@ static int cif_isp10_update_mi_sp(struct rkisp1_device *dev)
 	u32 d;
 	void *a;
 
-	v4l2_info(&dev->v4l2_dev,
-		  "curr 0x%08x next 0x%08x\n",
-		  dev->strm_vdevs.sp_vdev.path_cfg.curr_buff_addr,
-		  dev->strm_vdevs.sp_vdev.path_cfg.next_buff_addr);
 	if (dev->strm_vdevs.sp_vdev.path_cfg.next_buff_addr !=
 	    dev->strm_vdevs.sp_vdev.path_cfg.curr_buff_addr) {
 		if (dev->strm_vdevs.sp_vdev.path_cfg.next_buff_addr ==

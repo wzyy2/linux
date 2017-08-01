@@ -148,13 +148,7 @@ static void rkisp1_config_ism(struct rkisp1_device *dev, bool async)
 	void *a;
 
 	if (pconfig->ism_en) {
-		v4l2_info(&dev->v4l2_dev, "%dx%d -> %dx%d@(%d,%d)\n",
-			  dev->isp_sdev.isp_dev.input_width,
-			  dev->isp_sdev.isp_dev.input_height,
-			  pconfig->ism_params.h_size,
-			  pconfig->ism_params.v_size,
-			  pconfig->ism_params.h_offs,
-			  pconfig->ism_params.v_offs);
+
 		iowrite32(pconfig->ism_params.recenter,
 			  dev->config.base_addr + CIF_ISP_IS_RECENTER);
 		iowrite32(pconfig->ism_params.max_dx,
@@ -1444,13 +1438,13 @@ static void cifisp_isp_sd_init_default_fmt(struct rkisp1_device *isp_dev)
 	struct cif_isp10_frm_fmt *output_fmt =
 	    &isp_dev->isp_sdev.isp_config.output;
 
-	input_fmt->width = CIF_ISP_DEFAULT_WIDTH;
-	input_fmt->height = CIF_ISP_DEFAULT_HEIGHT;
+	input_fmt->width = 640;
+	input_fmt->height = 480;
 	input_fmt->defrect.left = 0;
 	input_fmt->defrect.top = 0;
 	input_fmt->defrect.width = input_fmt->width;
 	input_fmt->defrect.height = input_fmt->height;
-	input_fmt->pix_fmt = CIF_BAYER_SRGGB10;
+	input_fmt->pix_fmt = CIF_BAYER_SBGGR8;
 	//TODO
 	//input_fmt->quantization
 	//propagate to source
