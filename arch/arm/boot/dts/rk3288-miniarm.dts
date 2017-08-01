@@ -155,21 +155,33 @@
 		regulator-boot-on;
 	};
 
-	/*
-	 * NOTE: vcc_sd isn't hooked up on v1.0 boards where power comes from
-	 * vcc_io directly.  Those boards won't be able to power cycle SD cards
-	 * but it shouldn't hurt to toggle this pin there anyway.
-	 */
-	vcc_sd: sdmmc-regulator {
+	vcc_cam: vcc-cam {
 		compatible = "regulator-fixed";
-		gpio = <&gpio7 11 GPIO_ACTIVE_LOW>;
+		regulator-name = "vcc_cam";
 		pinctrl-names = "default";
-		pinctrl-0 = <&sdmmc_pwr>;
-		regulator-name = "vcc_sd";
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
-		startup-delay-us = <100000>;
-		vin-supply = <&vcc_io>;
+		pinctrl-0 = <&cam_pwr>;
+		enable-active-high;
+		gpio = <&gpio2 0 GPIO_ACTIVE_HIGH>;
+		regulator-always-on;
+		regulator-boot-on;
+	};
+
+	vcc_led: vcc-led {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc_cam";
+		pinctrl-names = "default";
+		pinctrl-0 = <&cam_mclk>;
+		enable-active-high;
+		gpio = <&gpio2 11 GPIO_ACTIVE_HIGH>;
+		regulator-always-on;
+		regulator-boot-on;
+	};
+
+	camera_clk: camera-clock {
+		compatible = "fixed-clock";
+		clock-frequency = <25000000>;
+		clock-output-names = "CLK_CAMERA_25MHZ";
+		#clock-cells = <0>;
 	};
 };
 
@@ -419,15 +431,6 @@
 	};
 };
 
-&i2c2 {
-	status = "okay";
-
-	m24c08@50 {
-		compatible = "at,24c08";
-		reg = <0x50>;
-	};
-};
-
 &i2c1 {
 	status = "okay";
 
@@ -436,6 +439,30 @@
 		compatible = "ti,pcm5122";
 		reg = <0x4c>;
 		status = "disabled";
+	};
+};
+
+&i2c2 {
+	status = "okay";
+
+	camera: ov5647@36 {
+		compatible = "ovti,ov5647";
+		reg = <0x36>;
+		clocks = <&camera_clk>;
+
+
+		status = "okay";
+		
+		port {
+			camera_out: endpoint {
+				remote-endpoint = <&isp_mipi_in>;
+			};
+		};
+	};
+	
+	m24c08@50 {
+		compatible = "at,24c08";
+		reg = <0x50>;
 	};
 };
 
@@ -686,6 +713,31 @@
 	wireless-bluetooth {
 		uart0_gpios: uart0-gpios {
 			rockchip,pins = <4 19 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
+
+	cam_pins {
+		cam_mclk: cam-mclk {
+			rockchip,pins = <2 11 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+
+		cam_pwr: cam-pwr {
+			rockchip,pins = <2 0 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
+};
+
+
+&cif_isp0 {
+	status = "okay";
+};
+
+&mipi_phy_rx0 {
+	status = "okay";
+
+	port {
+		isp_mipi_in: endpoint {
+			remote-endpoint = <&camera_out>;
 		};
 	};
 };
