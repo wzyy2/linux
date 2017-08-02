@@ -207,16 +207,16 @@ static int panel_simple_prepare(struct drm_panel *panel)
 
 	if (p->prepared)
 		return 0;
-
+	printk("%s %d \n", __func__, __LINE__);
 	err = regulator_enable(p->supply);
 	if (err < 0) {
 		dev_err(panel->dev, "failed to enable supply: %d\n", err);
 		return err;
 	}
-
+	printk("%s %d \n", __func__, __LINE__);
 	if (p->enable_gpio)
 		gpiod_set_value_cansleep(p->enable_gpio, 1);
-
+	printk("%s %d \n", __func__, __LINE__);
 	if (p->desc->delay.prepare)
 		msleep(p->desc->delay.prepare);
 
@@ -228,19 +228,19 @@ static int panel_simple_prepare(struct drm_panel *panel)
 static int panel_simple_enable(struct drm_panel *panel)
 {
 	struct panel_simple *p = to_panel_simple(panel);
-
+	printk("%s %d \n", __func__, __LINE__);
 	if (p->enabled)
 		return 0;
-
+	printk("%s %d \n", __func__, __LINE__);
 	if (p->desc->delay.enable)
 		msleep(p->desc->delay.enable);
-
+	printk("%s %d \n", __func__, __LINE__);
 	if (p->backlight) {
 		p->backlight->props.state &= ~BL_CORE_FBBLANK;
 		p->backlight->props.power = FB_BLANK_UNBLANK;
 		backlight_update_status(p->backlight);
 	}
-
+	printk("%s %d \n", __func__, __LINE__);
 	p->enabled = true;
 
 	return 0;
