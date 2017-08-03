@@ -49,13 +49,16 @@ static void pwm_backlight_power_on(struct pwm_bl_data *pb, int brightness)
 
 	if (pb->enabled)
 		return;
-
+	
 	err = regulator_enable(pb->power_supply);
 	if (err < 0)
 		dev_err(pb->dev, "failed to enable power supply\n");
 
-	if (pb->enable_gpio)
+	if (pb->enable_gpio) {
+		printk("%s %d \n", __func__, __LINE__);
 		gpiod_set_value_cansleep(pb->enable_gpio, 1);
+	}
+		
 
 	pwm_enable(pb->pwm);
 	pb->enabled = true;
@@ -63,9 +66,10 @@ static void pwm_backlight_power_on(struct pwm_bl_data *pb, int brightness)
 
 static void pwm_backlight_power_off(struct pwm_bl_data *pb)
 {
+		
 	if (!pb->enabled)
 		return;
-
+	
 	pwm_config(pb->pwm, 0, pb->period);
 	pwm_disable(pb->pwm);
 

@@ -2313,12 +2313,6 @@
 		};
 
 		hdmi {
-			hdmi_i2c_xfer: hdmi-i2c-xfer {
-				rockchip,pins =
-					<4 RK_PC1 RK_FUNC_3 &pcfg_pull_none>,
-					<4 RK_PC0 RK_FUNC_3 &pcfg_pull_none>;
-			};
-
 			hdmi_cec: hdmi-cec {
 				rockchip,pins =
 					<4 RK_PC7 RK_FUNC_1 &pcfg_pull_none>;
