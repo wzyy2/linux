@@ -33,8 +33,8 @@
 #define CIF_ISP_OUTPUT_W_MIN		CIF_ISP_INPUT_W_MIN
 #define CIF_ISP_OUTPUT_H_MIN		CIF_ISP_INPUT_H_MIN
 
-#define CIF_ISP_DEFAULT_W		800
-#define CIF_ISP_DEFAULT_H		600
+#define CIF_ISP_DEFAULT_W		640
+#define CIF_ISP_DEFAULT_H		480
 
 #define writel_and(val, addr) \
 		writel((val) & readl(addr), (addr))
@@ -515,10 +515,10 @@ static const struct cif_fmt_info cifisp_isp_output_formats[] = {
 
 static const struct cif_fmt_info cifisp_isp_input_formats[] = {
 	{
-	 .mbus_code = MEDIA_BUS_FMT_SRGGB10_1X10,
+	 .mbus_code = MEDIA_BUS_FMT_SBGGR8_1X8,
 	 .fmt_type = CIF_FMT_PIX_TYPE_BAYER,
-	 .bayer_pat = CIF_FMT_RAW_PAT_TYPE_RGGB,
-	 .bpp = 10,
+	 .bayer_pat = CIF_FMT_RAW_PAT_TYPE_BGGR,
+	 .bpp = 8,
 	 .colorspace = V4L2_COLORSPACE_SRGB,  //TODO: _COLORSPACE_RAW ?
 	},{
 	 .mbus_code = MEDIA_BUS_FMT_YUYV8_2X8,
