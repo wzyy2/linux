@@ -290,6 +290,19 @@ config VIDEO_ROCKCHIP_VPU
 	  To compile this driver as a module, choose M here: the module
 	  will be called rockchip-vpu.
 
+config VIDEO_RKISP1
+	tristate "Rockchip Isp1 Driver"
+	depends on VIDEO_V4L2 && I2C
+	depends on OF
+	select VIDEOBUF2_DMA_CONTIG
+	select VIDEOBUF2_VMALLOC
+	select MEDIA_CONTROLLER
+	default n
+
+	---help---
+	  Say Y here to enable selecting the
+	  rockchip isp1 driver
+
 config VIDEO_TI_VPE_DEBUG
 	bool "VPE debug messages"
 	depends on VIDEO_TI_VPE
