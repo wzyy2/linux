@@ -292,6 +292,13 @@
 		WIFI,host_wake_irq = <&gpio4 30 GPIO_ACTIVE_HIGH>;
 		status = "okay";
 	};
+
+	camera_clk: camera-clock {
+		compatible = "fixed-clock";
+		clock-frequency = <27000000>;
+		clock-output-names = "CLK_CAMERA_27MHZ";
+		#clock-cells = <0>;
+	};
 };
 
 &cpu0 {
@@ -302,7 +309,7 @@
 	vcc-supply = <&vdd_10>;
 	vccio-supply = <&vcc_18>;
 	force-hpd;
-	status = "okay";
+	status = "disabled";
 
 	ports {
 		edp_out: port@1 {
@@ -518,6 +525,32 @@
 &i2c1 {
 	status = "okay";
 
+	camera: tc358749@0f {
+		compatible = "toshiba,tc358749";
+		reg = <0x0f>;
+		clocks = <&camera_clk>;
+ 		clock-names = "refclk";
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&hdmiin_gpios>;
+
+		reset-gpios = <&gpio8 8 GPIO_ACTIVE_LOW>;
+
+		interrupt-parent = <&gpio8>;
+		interrupts = <9 IRQ_TYPE_LEVEL_LOW>;
+
+		port {
+			camera_out: endpoint {
+				remote-endpoint = <&isp_mipi_in>;
+				clock-lanes = <0>;
+				data-lanes = <1 2 3 4>;
+				clock-noncontinuous;
+				link-frequencies =
+					/bits/ 64 <297000000>;
+			};
+		};
+	};
+
 	mpu6050@68 {
 		compatible = "invensense,mpu6050";
 		reg = <0x68>;
@@ -562,6 +595,10 @@
 	status = "okay";
 };
 
+&cif_isp0 {
+	status = "okay";
+};
+
 &pinctrl {
 	pcfg_output_high: pcfg-output-high {
 		output-high;
@@ -603,6 +640,16 @@
 
 		phy_rst: phy-rst {
 			rockchip,pins = <4 8 RK_FUNC_GPIO &pcfg_output_high>;
+		};
+	};
+
+	hdmiin {
+		hdmiin_gpios: hdmiin-gpios {
+		rockchip,pins =
+				<7 5 RK_FUNC_GPIO &pcfg_output_high>,
+				<7 21 RK_FUNC_GPIO &pcfg_output_high>,
+				<8 8 RK_FUNC_GPIO &pcfg_pull_none>,
+				<8 9 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
 
@@ -801,4 +848,16 @@
 
 &wdt {
 	status = "okay";
+};
+
+&mipi_phy_rx0 {
+	bus-width = <4>;
+	status = "okay";
+
+	port {
+		isp_mipi_in: endpoint {
+			remote-endpoint = <&camera_out>;
+			data-lanes = <1 2 3 4>;
+		};
+	};
 };

@@ -60,4 +60,10 @@ obj-$(CONFIG_VIDEO_ROCKCHIP_VPU)	+= rockchip-vpu/
 
 ccflags-y += -I$(srctree)/drivers/media/i2c
 
-obj-$(CONFIG_VIDEO_RK_CIF_ISP10) += rk-isp10/
+obj-$(CONFIG_VIDEO_MEDIATEK_VPU)	+= mtk-vpu/
+
+obj-$(CONFIG_VIDEO_MEDIATEK_VCODEC)	+= mtk-vcodec/
+
+obj-$(CONFIG_VIDEO_MEDIATEK_MDP)	+= mtk-mdp/
+
+obj-$(CONFIG_VIDEO_MEDIATEK_JPEG)	+= mtk-jpeg/
