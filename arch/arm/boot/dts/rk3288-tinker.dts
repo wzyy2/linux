@@ -134,10 +134,42 @@
 		startup-delay-us = <100000>;
 		vin-supply = <&vcc_io>;
 	};
+
+	vcc_cam: vcc-camera {
+ 		compatible = "regulator-fixed";
+		regulator-name = "vcc_cam";
+ 		pinctrl-names = "default";
+		pinctrl-0 = <&cam_pwr>;
+		enable-active-high;
+		gpio = <&gpio2 0 GPIO_ACTIVE_HIGH>;
+		regulator-always-on;
+		regulator-boot-on;
+	};
+
+	ext_cam_clk: external-camera-clock {
+		compatible = "fixed-clock";
+		clock-frequency = <25000000>;
+		clock-output-names = "CLK_CAMERA_25MHZ";
+		#clock-cells = <0>;
+ 	};
 };
 
 &cpu0 {
 	cpu0-supply = <&vdd_cpu>;
+};
+
+&isp {
+	status = "okay";
+
+	port {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		isp_mipi_in: endpoint@0 {
+			reg = <0>;
+			remote-endpoint = <&dphy_rx0_out>;
+		};
+	};
 };
 
 &gmac {
@@ -292,7 +324,9 @@
 			};
 
 			vccio_sd: LDO_REG5 {
-				regulator-min-microvolt = <1800000>;
+				regulator-always-on;
+				regulator-boot-on;
+				regulator-min-microvolt = <3300000>;
 				regulator-max-microvolt = <3300000>;
 				regulator-name = "vccio_sd";
 				regulator-state-mem {
@@ -360,6 +394,20 @@
 
 &i2c2 {
 	status = "okay";
+
+	camera0: imx219@10 {
+		compatible = "sony,imx219";
+		reg = <0x10>;
+		clocks = <&ext_cam_clk>;
+		status = "okay";
+
+		port {
+			imx219_out: endpoint {
+				remote-endpoint = <&imx219_in>;
+				data-lanes = <1 2>;
+			};
+		};
+	};
 };
 
 &i2c5 {
@@ -375,6 +423,50 @@
 	status = "okay";
 
 	sdcard-supply = <&vccio_sd>;
+};
+
+&isp_mmu {
+	status = "okay";
+};
+
+&mipi_phy_rx0 {
+	status = "okay";
+
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			reg = <0>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			imx219_in: endpoint@0 {
+				reg = <0>;
+				remote-endpoint = <&imx219_out>;
+				data-lanes = <1 2>;
+			};
+
+			/*
+			ov5647_in: endpoint@1 {
+				reg = <1>;
+				remote-endpoint = <&ov5647_out>;
+				data-lanes = <1 2>;
+			};
+			*/
+		};
+	
+		port@1 {
+			reg = <1>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			dphy_rx0_out: endpoint@0 {
+				reg = <0>;
+				remote-endpoint = <&isp_mipi_in>;
+			};
+		};
+	};
 };
 
 &pinctrl {
@@ -453,6 +545,16 @@
 			rockchip,pins = <7 8 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
+
+	cam_pins {
+		cam_clk: cam-clk {
+			rockchip,pins = <2 11 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+
+		cam_pwr: cam-pwr {
+			rockchip,pins = <2 0 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
 };
 
 &pwm0 {
@@ -524,14 +626,6 @@
 };
 
 &vopb_mmu {
-	status = "okay";
-};
-
-&vopl {
-	status = "okay";
-};
-
-&vopl_mmu {
 	status = "okay";
 };
 

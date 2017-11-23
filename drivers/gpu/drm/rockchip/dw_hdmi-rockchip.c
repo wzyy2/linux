@@ -218,7 +218,7 @@ dw_hdmi_rockchip_mode_valid(struct drm_connector *connector,
 		}
 	}
 
-	return (valid) ? MODE_OK : MODE_BAD;
+	return MODE_OK;
 }
 
 static const struct drm_encoder_funcs dw_hdmi_rockchip_encoder_funcs = {
