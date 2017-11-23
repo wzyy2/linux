@@ -228,6 +228,8 @@ static int __get_v4l2_format32(struct v4l2_format __user *kp,
 	case V4L2_BUF_TYPE_META_CAPTURE:
 		return copy_in_user(&kp->fmt.meta, &up->fmt.meta,
 				    sizeof(kp->fmt.meta)) ? -EFAULT : 0;
+	case V4L2_BUF_TYPE_META_OUTPUT:
+		return get_v4l2_meta_format(&kp->fmt.meta, &up->fmt.meta);
 	default:
 		return -EINVAL;
 	}
@@ -297,6 +299,8 @@ static int __put_v4l2_format32(struct v4l2_format __user *kp,
 	case V4L2_BUF_TYPE_META_CAPTURE:
 		return copy_in_user(&up->fmt.meta, &kp->fmt.meta,
 				    sizeof(kp->fmt.meta)) ? -EFAULT : 0;
+	case V4L2_BUF_TYPE_META_OUTPUT:
+		return put_v4l2_meta_format(&kp->fmt.meta, &up->fmt.meta);
 	default:
 		return -EINVAL;
 	}
