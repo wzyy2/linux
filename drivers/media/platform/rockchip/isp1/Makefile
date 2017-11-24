@@ -4,4 +4,5 @@ video_rkisp1-objs 	   += 	rkisp1.o \
 				regs.o \
 				isp_stats.o \
 				isp_params.o \
+				mipi_dphy_sy.o \
 				capture.o
