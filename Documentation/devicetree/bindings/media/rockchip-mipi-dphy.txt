@@ -1,0 +1,77 @@
+Rockchip SoC MIPI RX D-PHY
+-------------------------------------------------------------
+
+Required properties:
+
+- compatible: value should be one of the following
+    "rockchip,rk3288-mipi-dphy";
+    "rockchip,rk3399-mipi-dphy";
+- rockchip,grf: GRF regs.
+- bus-width	  : maximum number of data lanes supported (SoC specific);
+- clocks	  : list of clock specifiers, corresponding to entries in
+		    clock-names property;
+- clock-names: required clock name.
+
+The device node should contain two 'port' child node, according to the bindings
+defined in Documentation/devicetree/bindings/media/video-interfaces.txt.
+The first port should be connected to sensor nodes, and the second port should be
+connected to isp node. The following are properties specific to those nodes.
+
+endpoint node
+-------------
+
+- data-lanes	  : (required) an array specifying active physical MIPI-CSI2
+		    data input lanes and their mapping to logical lanes; the
+		    array's content is unused, only its length is meaningful;
+
+
+Example:
+
+/* SoC properties */
+
+    mipi_dphy_rx0: mipi-dphy-rx0 {
+        compatible = "rockchip,rk3399-mipi-dphy";
+        clocks = <&cru SCLK_MIPIDPHY_REF>,
+            <&cru SCLK_DPHY_RX0_CFG>,
+            <&cru PCLK_VIO_GRF>;
+        clock-names = "dphy-ref", "dphy-cfg", "grf";
+        power-domains = <&power RK3399_PD_VIO>;
+        bus-width = <4>;
+    };
+
+/* Board properties */
+
+    &mipi_phy_rx0 {
+        ports {
+            #address-cells = <1>;
+            #size-cells = <0>;
+
+            port@0 {
+                reg = <0>;
+                #address-cells = <1>;
+                #size-cells = <0>;
+
+                mipi_in_wcam: endpoint@0 {
+                    reg = <0>;
+                    remote-endpoint = <&wcam_out>;
+                    data-lanes = <1 2>;
+                };
+                mipi_in_ucam: endpoint@1 {
+                    reg = <1>;
+                    remote-endpoint = <&ucam_out>;
+                    data-lanes = <1>;
+                };
+            };
+
+            port@1 {
+                reg = <1>;
+                #address-cells = <1>;
+                #size-cells = <0>;
+
+                dphy_rx0_out: endpoint@0 {
+                    reg = <0>;
+                    remote-endpoint = <&isp0_mipi_in>;
+                };
+            };
+        };
+    };
